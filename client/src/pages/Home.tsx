@@ -1,12 +1,28 @@
 import React from 'react';
-import { Container, Typography, Grid, Card, CardContent, CardMedia, Button } from '@mui/material';
+import { Container, Typography, Grid, Card, CardContent, CardMedia, Button, Box } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
 const categories = [
-  { name: 'Fun', image: '/images/fun.jpg', description: 'Discover exciting activities for everyone' },
-  { name: 'Hikes', image: '/images/hikes.jpg', description: 'Explore beautiful trails and nature' },
-  { name: 'Food', image: '/images/food.jpg', description: 'Find the best places to eat' },
-  { name: 'Entertainment', image: '/images/entertainment.jpg', description: 'Enjoy shows and events' },
+  {
+    name: 'Fun',
+    image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
+    description: 'Discover exciting activities for everyone'
+  },
+  {
+    name: 'Hikes',
+    image: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca',
+    description: 'Explore beautiful trails and nature'
+  },
+  {
+    name: 'Food',
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836',
+    description: 'Find the best places to eat'
+  },
+  {
+    name: 'Entertainment',
+    image: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+    description: 'Enjoy shows and events'
+  },
 ];
 
 const Home: React.FC = () => {

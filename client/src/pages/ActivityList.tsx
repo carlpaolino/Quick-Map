@@ -6,6 +6,7 @@ import {
   Grid,
   Card,
   CardContent,
+  CardMedia,
   Typography,
   Box,
   Chip,
@@ -24,7 +25,17 @@ interface Activity {
   address: string;
   rating: number;
   priceRange?: string;
+  images?: string[];
 }
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  fun: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb',
+  hikes: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca',
+  food: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836',
+  entertainment: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4',
+  sports: 'https://images.unsplash.com/photo-1517649763962-0c623066013b',
+  cultural: 'https://images.unsplash.com/photo-1464983953574-0892a716854b',
+};
 
 const ActivityList: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -120,6 +131,23 @@ const ActivityList: React.FC = () => {
                 }}
                 onClick={() => setSelectedActivity(activity)}
               >
+                {(activity.images && activity.images.length > 0) || CATEGORY_IMAGES[activity.category] ? (
+                  <CardMedia
+                    component="div"
+                    sx={{
+                      height: 140,
+                      mb: 1,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      borderRadius: 1,
+                      backgroundImage: `url(${
+                        activity.images && activity.images.length > 0
+                          ? activity.images[0]
+                          : CATEGORY_IMAGES[activity.category] || CATEGORY_IMAGES['fun']
+                      })`,
+                    }}
+                  />
+                ) : null}
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
                     {activity.name}
@@ -147,4 +175,4 @@ const ActivityList: React.FC = () => {
   );
 };
 
-export default ActivityList; 
+export default ActivityList;
