@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, MarkerClusterer, LoadScript } from '@react-google-maps/api';
 import {
   Container,
   Grid,
@@ -83,6 +83,12 @@ const ActivityList: React.FC = () => {
     fetchActivities();
   }, [searchParams, userLocation]);
 
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
+  });
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [infoActivity, setInfoActivity] = useState<Activity | null>(null);
+
   const mapContainerStyle = {
     width: '100%',
     height: '400px',
@@ -99,24 +105,54 @@ const ActivityList: React.FC = () => {
               <CircularProgress />
             </Box>
           ) : (
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}>
+            !isLoaded ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+                <CircularProgress />
+              </Box>
+            ) : (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={center}
                 zoom={12}
               >
-                {activities.map((activity) => (
-                  <Marker
-                    key={activity._id}
+                <MarkerClusterer>
+                  {(clusterer) => (
+                    <>
+                      {activities.map((activity) => (
+                        <Marker
+                          key={activity._id}
+                          position={{
+                            lat: activity.location.coordinates[1],
+                            lng: activity.location.coordinates[0],
+                          }}
+                          clusterer={clusterer}
+                          onClick={() => {
+                            setInfoActivity(activity);
+                            setInfoOpen(true);
+                            setSelectedActivity(activity);
+                          }}
+                        />
+                      ))}
+                    </>
+                  )}
+                </MarkerClusterer>
+                {infoOpen && infoActivity && (
+                  <InfoWindow
                     position={{
-                      lat: activity.location.coordinates[1],
-                      lng: activity.location.coordinates[0],
+                      lat: infoActivity.location.coordinates[1],
+                      lng: infoActivity.location.coordinates[0],
                     }}
-                    onClick={() => setSelectedActivity(activity)}
-                  />
-                ))}
+                    onCloseClick={() => setInfoOpen(false)}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>{infoActivity.name}</Typography>
+                      <Typography variant="body2">{infoActivity.address}</Typography>
+                      <Typography variant="body2">{infoActivity.description}</Typography>
+                    </Box>
+                  </InfoWindow>
+                )}
               </GoogleMap>
-            </LoadScript>
+            )
           )}
         </Grid>
         <Grid item xs={12} md={4}>

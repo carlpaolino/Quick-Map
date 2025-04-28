@@ -13,7 +13,7 @@ import {
   Divider,
 } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
-import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
 import axios from 'axios';
 
 interface Activity {
@@ -37,6 +37,16 @@ const ActivityDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Moved hooks to top-level to comply with React rules
+  const mapContainerStyle = {
+    width: '100%',
+    height: '300px',
+  };
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
+  });
+  const [infoOpen, setInfoOpen] = useState(false);
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -72,11 +82,6 @@ const ActivityDetail: React.FC = () => {
     );
   }
 
-  const mapContainerStyle = {
-    width: '100%',
-    height: '300px',
-  };
-
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Grid container spacing={4}>
@@ -99,7 +104,11 @@ const ActivityDetail: React.FC = () => {
             Location
           </Typography>
           <Box sx={{ height: 300, mb: 3 }}>
-            <LoadScript googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY || ''}>
+            {!isLoaded ? (
+              <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
+                <CircularProgress />
+              </Box>
+            ) : (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
                 center={{
@@ -113,9 +122,25 @@ const ActivityDetail: React.FC = () => {
                     lat: activity.location.coordinates[1],
                     lng: activity.location.coordinates[0],
                   }}
+                  onClick={() => setInfoOpen(true)}
                 />
+                {infoOpen && (
+                  <InfoWindow
+                    position={{
+                      lat: activity.location.coordinates[1],
+                      lng: activity.location.coordinates[0],
+                    }}
+                    onCloseClick={() => setInfoOpen(false)}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>{activity.name}</Typography>
+                      <Typography variant="body2">{activity.address}</Typography>
+                      <Typography variant="body2">{activity.description}</Typography>
+                    </Box>
+                  </InfoWindow>
+                )}
               </GoogleMap>
-            </LoadScript>
+            )}
           </Box>
           <Typography variant="body1" paragraph>
             {activity.address}
@@ -160,4 +185,4 @@ const ActivityDetail: React.FC = () => {
   );
 };
 
-export default ActivityDetail; 
+export default ActivityDetail;
