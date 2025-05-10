@@ -21,15 +21,32 @@ router.get('/events', async (req, res) => {
       ...(lat && lon ? {
         'lat': toStringOrUndefined(lat),
         'lon': toStringOrUndefined(lon),
-        'range': toStringOrUndefined(range) || '30mi'
+        'range': toStringOrUndefined(range) || '100mi'
       } : {}),
       ...(type ? { 'taxonomies.name': toStringOrUndefined(type) } : {}),
       'datetime_utc.gte': new Date().toISOString(),
     };
+    console.log('SeatGeek API params:', params);
     const response = await axios.get('https://api.seatgeek.com/2/events', { params });
+    console.log('Full SeatGeek API response:', JSON.stringify(response.data, null, 2));
+    interface SeatGeekEvent {
+      title: string;
+      datetime_local: string;
+      venue?: { name?: string };
+      // add other relevant fields as needed
+    }
+    console.log('SeatGeek events:', (response.data.events as SeatGeekEvent[]).map((e) => ({
+      title: e.title,
+      datetime_local: e.datetime_local,
+      venue: e.venue && e.venue.name
+    })));
     res.json(response.data.events);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message || 'Failed to fetch SeatGeek events' });
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'message' in error) {
+      res.status(500).json({ error: (error as { message?: string }).message || 'Failed to fetch SeatGeek events' });
+    } else {
+      res.status(500).json({ error: 'Failed to fetch SeatGeek events' });
+    }
   }
 });
 

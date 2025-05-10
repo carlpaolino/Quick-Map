@@ -262,199 +262,164 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoActivity, setInfoActivity] = useState<Activity | null>(null);
 
-  const mapContainerStyle = {
-    width: '100%',
-    height: '400px',
+  // Fullscreen map style for GoogleMap
+  const fullscreenMapStyle = {
+    width: '100vw',
+    height: '100vh',
   };
 
-  const center = userLocation || { lat: 0, lng: 0 };
+  const floatingPanelStyle = {
+    position: 'fixed' as const,
+    top: 32,
+    right: 32,
+    width: 400,
+    maxHeight: '80vh',
+    overflowY: 'auto' as const,
+    zIndex: 2,
+    background: 'rgba(255,255,255,0.97)',
+    borderRadius: 12,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+    padding: 24,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 16,
+  };
+
+  const center = userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : { lat: 34.02, lng: -84.59 };
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', flexDirection: 'row', width: '100%', minWidth: '800px', overflowX: 'auto' }}>
-        {/* Map and other UI code here */}
-
-        <Box mt={4}>
-          {seatGeekEvents.length > 0 && (
-            <Grid container spacing={2}>
-              {seatGeekEvents.map((event: any) => (
-                <Grid item xs={12} sm={6} md={4} key={event.id}>
-                  <Card>
-                    <CardContent>
-                      <Typography variant="subtitle1" fontWeight="bold">{event.title}</Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        {event.venue && event.venue.name}
-                      </Typography>
-                      <Typography variant="body2">
-                        {event.datetime_local && new Date(event.datetime_local).toLocaleString()}
-                      </Typography>
-                      <Box mt={1}>
-                        <Button href={event.url} target="_blank" rel="noopener" size="small" variant="outlined">View Event</Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          )}
+    <Box sx={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      {/* Fullscreen Google Map */}
+      {!isLoaded || loading || !userLocation ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+          <CircularProgress />
         </Box>
-        <Box sx={{ flex: '0 0 600px', minWidth: '600px', maxWidth: '600px', mr: 3 }}>
-          {loading ? (
-            <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      ) : (
+        <GoogleMap
+          mapContainerStyle={fullscreenMapStyle}
+          center={center}
+          zoom={12}
+        >
+          <MarkerClusterer>
+            {(clusterer) => (
+              <>
+                {activities.map((activity) => (
+                  <Marker
+                    key={activity._id}
+                    position={{
+                      lat: activity.location.coordinates[1],
+                      lng: activity.location.coordinates[0],
+                    }}
+                    clusterer={clusterer}
+                    onClick={() => {
+                      setInfoActivity(activity);
+                      setInfoOpen(true);
+                      setSelectedActivity(activity);
+                    }}
+                  />
+                ))}
+              </>
+            )}
+          </MarkerClusterer>
+          {infoOpen && infoActivity && (
+            <InfoWindow
+              position={{
+                lat: infoActivity.location.coordinates[1],
+                lng: infoActivity.location.coordinates[0],
+              }}
+              onCloseClick={() => setInfoOpen(false)}
+            >
+              <Box>
+                <Typography variant="subtitle1" gutterBottom>{infoActivity.name}</Typography>
+                <Typography variant="body2">{infoActivity.address}</Typography>
+                <Typography variant="body2">{infoActivity.description}</Typography>
+              </Box>
+            </InfoWindow>
+          )}
+        </GoogleMap>
+      )}
+      {/* Floating panel for activities/events/places */}
+      <Box sx={{
+        ...floatingPanelStyle,
+        p: 3,
+        borderRadius: 4,
+        boxShadow: 6,
+        bgcolor: 'rgba(255,255,255,0.95)',
+        maxHeight: '85vh',
+        minWidth: 340,
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 2,
+      }}>
+        <Typography variant="h5" gutterBottom>
+          {category === 'entertainment' ? 'Events Nearby' : 'Related Places Nearby'}
+        </Typography>
+        {category === 'entertainment' ? (
+          loading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
               <CircularProgress />
             </Box>
-          ) : (
-            // ... other code ...
-            !isLoaded ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
-                <CircularProgress />
-              </Box>
-            ) : (
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                center={center}
-                zoom={12}
-              >
-                <MarkerClusterer>
-                  {(clusterer) => (
-                    <>
-                      {activities.map((activity) => (
-                        <Marker
-                          key={activity._id}
-                          position={{
-                            lat: activity.location.coordinates[1],
-                            lng: activity.location.coordinates[0],
-                          }}
-                          clusterer={clusterer}
-                          onClick={() => {
-                            setInfoActivity(activity);
-                            setInfoOpen(true);
-                            setSelectedActivity(activity);
-                          }}
-                        />
-                      ))}
-                    </>
-                  )}
-                </MarkerClusterer>
-                {infoOpen && infoActivity && (
-                  <InfoWindow
-                    position={{
-                      lat: infoActivity.location.coordinates[1],
-                      lng: infoActivity.location.coordinates[0],
-                    }}
-                    onCloseClick={() => setInfoOpen(false)}
-                  >
-                    <Box>
-                      <Typography variant="subtitle1" gutterBottom>{infoActivity.name}</Typography>
-                      <Typography variant="body2">{infoActivity.address}</Typography>
-                      <Typography variant="body2">{infoActivity.description}</Typography>
-                    </Box>
-                  </InfoWindow>
-                )}
-              </GoogleMap>
-            )
-          )}
-        </Box>
-        {/* List section */}
-        <Box sx={{ flex: '0 0 320px', minWidth: '320px', maxWidth: '320px', borderLeft: 1, borderColor: 'divider', pl: 3, maxHeight: '400px', overflow: 'auto' }}>
-          {activities.map((activity) => (
-            <Card
-              key={activity._id}
-              sx={{
-                mb: 2,
-                cursor: 'pointer',
-                backgroundColor: selectedActivity?._id === activity._id ? 'action.selected' : 'background.paper',
-              }}
-              onClick={() => setSelectedActivity(activity)}
-            >
-              {(activity.images && activity.images.length > 0) || CATEGORY_IMAGES[activity.category] ? (
-                <CardMedia
-                  component="div"
-                  sx={{
-                    height: 140,
-                    mb: 1,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    borderRadius: 1,
-                    backgroundImage: `url(${
-                      activity.images && activity.images.length > 0
-                        ? activity.images[0]
-                        : CATEGORY_IMAGES[activity.category] || CATEGORY_IMAGES['fun']
-                    })`,
-                  }}
-                />
-              ) : null}
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {activity.name}
-                </Typography>
-                <Chip
-                  label={activity.category}
-                  size="small"
-                  sx={{ mb: 1 }}
-                />
-                {activity.priceRange && (
-                  <Typography variant="body2" color="text.secondary" gutterBottom>
-                    Price: {activity.priceRange}
-                  </Typography>
-                )}
-                <Typography variant="body2" color="text.secondary">
-                  {activity.address}
-                </Typography>
-              </CardContent>
-            </Card>
-          ))}
-          {/* Section title changes based on category */}
-          <Typography variant="subtitle1" gutterBottom>
-            {category === 'entertainment' ? 'Events Nearby' : 'Related Places Nearby'}
-          </Typography>
-          {category === 'entertainment' ? (
-            googlePlaces
-              .filter((event): event is GooglePlace => Boolean(event && event.place_id && event.name && event.type && (event.type === 'concert' || event.type === 'sports')))
-              .map((event) => (
-                <Card key={event.place_id} sx={{ mb: 2 }}>
-                  <CardContent>
-                    <Typography variant="subtitle1" gutterBottom>
-                      {event.name}
-                    </Typography>
-                    {event.date ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Date: {event.date}
-                      </Typography>
-                    ) : null}
-                    {typeof event.type === 'string' && (
-                      <Chip label={event.type.charAt(0).toUpperCase() + event.type.slice(1)} size="small" sx={{ mt: 1, mr: 1 }} />
-                    )}
-                    {event.vicinity && (
-                      <Typography variant="body2" color="text.secondary">
-                        Venue: {event.vicinity}
-                      </Typography>
-                    )}
-                    {(event.description || event.vicinity) && (
-                      <Typography variant="body2" color="text.secondary">
-                        {event.description || event.vicinity}
-                      </Typography>
-                    )}
-                    {typeof event.rating === 'number' ? (
-                      <Typography variant="body2" color="text.secondary">
-                        Rating: {event.rating}
-                      </Typography>
-                    ) : null}
-                    {event.url ? (
-                      <Typography variant="body2">
-                        <a href={event.url} target="_blank" rel="noopener noreferrer">
-                          View Event
-                        </a>
-                      </Typography>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              ))
-          ) : (
-            googlePlaces.filter((place): place is GooglePlace => Boolean(place && place.place_id && place.name)).map((place) => (
-              <Card key={place.place_id} sx={{ mb: 2 }}>
+          ) : seatGeekEvents.length > 0 ? (
+            seatGeekEvents.map((event: any) => (
+              <Card key={event.id} sx={{ mb: 2 }}>
                 <CardContent>
                   <Typography variant="subtitle1" gutterBottom>
+                    {event.title}
+                  </Typography>
+                  {event.datetime_local && (
+                    <Typography variant="body2" color="text.secondary">
+                      Date: {new Date(event.datetime_local).toLocaleString()}
+                    </Typography>
+                  )}
+                  {event.type && (
+                    <Chip label={event.type.charAt(0).toUpperCase() + event.type.slice(1)} size="small" sx={{ mt: 1, mr: 1 }} />
+                  )}
+                  {event.venue && event.venue.name && (
+                    <Typography variant="body2" color="text.secondary">
+                      Venue: {event.venue.name}
+                    </Typography>
+                  )}
+                  {event.description && (
+                    <Typography variant="body2" color="text.secondary">
+                      {event.description}
+                    </Typography>
+                  )}
+                  {event.url && (
+                    <Typography variant="body2">
+                      <a href={event.url} target="_blank" rel="noopener noreferrer">
+                        View Event
+                      </a>
+                    </Typography>
+                  )}
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Typography variant="body2">No upcoming events found.</Typography>
+          )
+        ) : (
+          placesLoading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+              <CircularProgress />
+            </Box>
+          ) : googlePlaces && googlePlaces.length > 0 ? (
+            googlePlaces.filter((place): place is GooglePlace => Boolean(place && place.place_id && place.name)).map((place) => (
+              <Card key={place.place_id} sx={{ mb: 3, display: 'flex', alignItems: 'center', p: 2, boxShadow: 3, borderRadius: 3, minHeight: 110 }}>
+                {place.photos && place.photos.length > 0 ? (
+                  <CardMedia
+                    component="img"
+                    image={`https://maps.googleapis.com/maps/api/place/photo?maxwidth=120&photoreference=${place.photos[0].photo_reference}&key=${process.env.REACT_APP_GOOGLE_MAPS_API_KEY}`}
+                    alt={place.name}
+                    sx={{ width: 120, height: 90, borderRadius: 2, mr: 3, objectFit: 'cover' }}
+                  />
+                ) : (
+                  <Box sx={{ width: 120, height: 90, borderRadius: 2, bgcolor: 'grey.200', display: 'flex', alignItems: 'center', justifyContent: 'center', mr: 3 }}>
+                    <span role="img" aria-label="Place" style={{ fontSize: 36 }}>📍</span>
+                  </Box>
+                )}
+                <CardContent sx={{ flex: 1, p: 0, pl: 1 }}>
+                  <Typography variant="h6" gutterBottom sx={{ fontWeight: 700, fontSize: '1.15rem' }}>
                     {place.name}
                   </Typography>
                   {place.vicinity && (
@@ -462,26 +427,33 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
                       {place.vicinity}
                     </Typography>
                   )}
-                  {typeof place.rating === 'number' ? (
+                  {typeof place.rating === 'number' && (
                     <Typography variant="body2" color="text.secondary">
-                      Rating: {place.rating}
+                      Rating: {place.rating} ⭐
                     </Typography>
-                  ) : null}
-                  {place.url ? (
-                    <Typography variant="body2">
-                      <a href={place.url} target="_blank" rel="noopener noreferrer">
-                        View Place
-                      </a>
-                    </Typography>
-                  ) : null}
+                  )}
+                  <Box sx={{ mt: 1 }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      color="primary"
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(place.name + ' ' + (place.vicinity || ''))}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Open in Maps
+                    </Button>
+                  </Box>
                 </CardContent>
               </Card>
             ))
-          )}
-        </Box>
+          ) : (
+            <Typography variant="body2">No places found.</Typography>
+          )
+        )}
       </Box>
-    </Container>
+    </Box>
   );
-}
+};
 
 export default ActivityList;

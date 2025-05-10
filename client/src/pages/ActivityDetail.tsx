@@ -90,179 +90,191 @@ const ActivityDetail: React.FC = () => {
 
   if (!activity) {
     return (
-      <Container>
-        <Typography variant="h5" align="center" sx={{ mt: 4 }}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+        <Typography variant="h5" align="center">
           Activity not found
         </Typography>
-      </Container>
+      </Box>
     );
   }
 
+  // Fullscreen map style for GoogleMap
+  const fullscreenMapStyle = {
+    width: '100vw',
+    height: '100vh',
+  };
+  // Note: No position/top/left/zIndex here; GoogleMap handles the layout.
+
+
+  // Floating panel style
+  const floatingPanelStyle = {
+    position: 'fixed' as const,
+    top: 32,
+    right: 32,
+    width: 360,
+    maxHeight: '80vh',
+    overflowY: 'auto' as const,
+    zIndex: 2,
+    background: 'rgba(255,255,255,0.97)',
+    borderRadius: 12,
+    boxShadow: '0 4px 24px rgba(0,0,0,0.15)',
+    padding: 24,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: 16,
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Grid container spacing={4}>
-        <Grid item xs={12} md={8}>
-          <Typography variant="h4" gutterBottom>
-            {activity.name}
-          </Typography>
-          <Box sx={{ mb: 2 }}>
-            <Chip label={activity.category} color="primary" sx={{ mr: 1 }} />
-            {activity.priceRange && (
-              <Chip label={activity.priceRange} variant="outlined" />
-            )}
-          </Box>
-          <Rating value={activity.rating} readOnly precision={0.5} sx={{ mb: 2 }} />
-          <Typography variant="body1" paragraph>
-            {activity.description}
-          </Typography>
-          <Divider sx={{ my: 3 }} />
-          <Typography variant="h6" gutterBottom>
-            Location
-          </Typography>
-          <Box sx={{ height: 300, mb: 3, position: 'relative' }}>
-            {!isLoaded ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
-                <CircularProgress />
+    <Box sx={{ width: '100vw', height: '100vh', position: 'relative' }}>
+      {/* Fullscreen Google Map */}
+      {!isLoaded ? (
+        <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
+          <CircularProgress />
+        </Box>
+      ) : (
+        <GoogleMap
+          mapContainerStyle={fullscreenMapStyle}
+          center={{
+            lat: activity.location.coordinates[1],
+            lng: activity.location.coordinates[0],
+          }}
+          zoom={15}
+        >
+          {/* Main activity marker */}
+          <Marker
+            position={{
+              lat: activity.location.coordinates[1],
+              lng: activity.location.coordinates[0],
+            }}
+            onClick={() => setInfoOpen(true)}
+          />
+          {/* Related activities markers */}
+          {related.map((rel) => (
+            <Marker
+              key={rel._id}
+              position={{
+                lat: rel.location.coordinates[1],
+                lng: rel.location.coordinates[0],
+              }}
+              onMouseOver={() => setHighlightedId(rel._id)}
+              onMouseOut={() => setHighlightedId(null)}
+              onClick={() => setSelectedMarker(rel._id)}
+              icon={highlightedId === rel._id || selectedMarker === rel._id ? {
+                url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                scaledSize: new window.google.maps.Size(40, 40),
+              } : undefined}
+            />
+          ))}
+          {/* InfoWindow for selected related marker */}
+          {selectedMarker && related.find(r => r._id === selectedMarker) && (
+            <InfoWindow
+              position={{
+                lat: related.find(r => r._id === selectedMarker)!.location.coordinates[1],
+                lng: related.find(r => r._id === selectedMarker)!.location.coordinates[0],
+              }}
+              onCloseClick={() => setSelectedMarker(null)}
+            >
+              <Box>
+                <Typography variant="subtitle1" gutterBottom>{related.find(r => r._id === selectedMarker)!.name}</Typography>
+                <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.address}</Typography>
+                <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.description}</Typography>
               </Box>
-            ) : (
-              <GoogleMap
-                mapContainerStyle={mapContainerStyle}
-                center={{
-                  lat: activity.location.coordinates[1],
-                  lng: activity.location.coordinates[0],
-                }}
-                zoom={15}
+            </InfoWindow>
+          )}
+          {/* InfoWindow for main activity */}
+          {infoOpen && (
+            <InfoWindow
+              position={{
+                lat: activity.location.coordinates[1],
+                lng: activity.location.coordinates[0],
+              }}
+              onCloseClick={() => setInfoOpen(false)}
+            >
+              <Box>
+                <Typography variant="subtitle1" gutterBottom>{activity.name}</Typography>
+                <Typography variant="body2">{activity.address}</Typography>
+                <Typography variant="body2">{activity.description}</Typography>
+              </Box>
+            </InfoWindow>
+          )}
+        </GoogleMap>
+      )}
+      {/* Floating panel for related places & contact info */}
+      <Box sx={floatingPanelStyle}>
+        <Typography variant="h5" gutterBottom>
+          {activity.name}
+        </Typography>
+        <Box sx={{ mb: 1 }}>
+          <Chip label={activity.category} color="primary" sx={{ mr: 1 }} />
+          {activity.priceRange && (
+            <Chip label={activity.priceRange} variant="outlined" />
+          )}
+        </Box>
+        <Rating value={activity.rating} readOnly precision={0.5} sx={{ mb: 1 }} />
+        <Typography variant="body2" paragraph>
+          {activity.description}
+        </Typography>
+        <Typography variant="subtitle1" gutterBottom>
+          Related Places & Events
+        </Typography>
+        {related.length === 0 ? (
+          <Typography variant="body2">No related places found.</Typography>
+        ) : (
+          <List dense>
+            {related.map((rel) => (
+              <ListItem
+                key={rel._id}
+                onMouseEnter={() => setHighlightedId(rel._id)}
+                onMouseLeave={() => setHighlightedId(null)}
+                onClick={() => setSelectedMarker(rel._id)}
+                selected={highlightedId === rel._id || selectedMarker === rel._id}
+                sx={{ cursor: 'pointer', bgcolor: (highlightedId === rel._id || selectedMarker === rel._id) ? 'action.selected' : undefined }}
               >
-                {/* Main activity marker */}
-                <Marker
-                  position={{
-                    lat: activity.location.coordinates[1],
-                    lng: activity.location.coordinates[0],
-                  }}
-                  onClick={() => setInfoOpen(true)}
-                  icon={highlightedId === activity._id ? undefined : undefined}
+                <ListItemAvatar>
+                  <Avatar src={rel.images && rel.images[0]} alt={rel.name} />
+                </ListItemAvatar>
+                <ListItemText
+                  primary={rel.name}
+                  secondary={rel.address}
                 />
-                {/* Related activities markers */}
-                {related.map((rel) => (
-                  <Marker
-                    key={rel._id}
-                    position={{
-                      lat: rel.location.coordinates[1],
-                      lng: rel.location.coordinates[0],
-                    }}
-                    onMouseOver={() => setHighlightedId(rel._id)}
-                    onMouseOut={() => setHighlightedId(null)}
-                    onClick={() => setSelectedMarker(rel._id)}
-                    icon={highlightedId === rel._id || selectedMarker === rel._id ? {
-                      url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
-                      scaledSize: new window.google.maps.Size(40, 40),
-                    } : undefined}
-                  />
-                ))}
-                {/* InfoWindow for selected related marker */}
-                {selectedMarker && related.find(r => r._id === selectedMarker) && (
-                  <InfoWindow
-                    position={{
-                      lat: related.find(r => r._id === selectedMarker)!.location.coordinates[1],
-                      lng: related.find(r => r._id === selectedMarker)!.location.coordinates[0],
-                    }}
-                    onCloseClick={() => setSelectedMarker(null)}
-                  >
-                    <Box>
-                      <Typography variant="subtitle1" gutterBottom>{related.find(r => r._id === selectedMarker)!.name}</Typography>
-                      <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.address}</Typography>
-                      <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.description}</Typography>
-                    </Box>
-                  </InfoWindow>
-                )}
-                {/* InfoWindow for main activity */}
-                {infoOpen && (
-                  <InfoWindow
-                    position={{
-                      lat: activity.location.coordinates[1],
-                      lng: activity.location.coordinates[0],
-                    }}
-                    onCloseClick={() => setInfoOpen(false)}
-                  >
-                    <Box>
-                      <Typography variant="subtitle1" gutterBottom>{activity.name}</Typography>
-                      <Typography variant="body2">{activity.address}</Typography>
-                      <Typography variant="body2">{activity.description}</Typography>
-                    </Box>
-                  </InfoWindow>
-                )}
-              </GoogleMap>
-            )}
-          </Box>
+              </ListItem>
+            ))}
+          </List>
+        )}
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="h6" gutterBottom>
+          Contact Information
+        </Typography>
+        {activity.phone && (
           <Typography variant="body1" paragraph>
-            {activity.address}
+            Phone: {activity.phone}
           </Typography>
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Paper elevation={3} sx={{ mb: 3, p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Related Places & Events
+        )}
+        {activity.website && (
+          <Typography variant="body1" paragraph>
+            Website:{' '}
+            <a href={activity.website} target="_blank" rel="noopener noreferrer">
+              {activity.website}
+            </a>
+          </Typography>
+        )}
+        {activity.hours && (
+          <>
+            <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
+              Hours
             </Typography>
-            {related.length === 0 ? (
-              <Typography variant="body2">No related places found.</Typography>
-            ) : (
-              <List dense>
-                {related.map((rel) => (
-                  <ListItem
-                    key={rel._id}
-                    onMouseEnter={() => setHighlightedId(rel._id)}
-                    onMouseLeave={() => setHighlightedId(null)}
-                    onClick={() => setSelectedMarker(rel._id)}
-                    selected={highlightedId === rel._id || selectedMarker === rel._id}
-                    sx={{ cursor: 'pointer', bgcolor: (highlightedId === rel._id || selectedMarker === rel._id) ? 'action.selected' : undefined }}
-                  >
-                    <ListItemAvatar>
-                      <Avatar src={rel.images && rel.images[0]} alt={rel.name} />
-                    </ListItemAvatar>
-                    <ListItemText
-                      primary={rel.name}
-                      secondary={rel.address}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </Paper>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Contact Information
+            {Object.entries(activity.hours).map(([day, hours]) => (
+              <Typography key={day} variant="body2">
+                {day}: {hours}
               </Typography>
-              {activity.phone && (
-                <Typography variant="body1" paragraph>
-                  Phone: {activity.phone}
-                </Typography>
-              )}
-              {activity.website && (
-                <Typography variant="body1" paragraph>
-                  Website:{' '}
-                  <a href={activity.website} target="_blank" rel="noopener noreferrer">
-                    {activity.website}
-                  </a>
-                </Typography>
-              )}
-              {activity.hours && (
-                <>
-                  <Typography variant="h6" gutterBottom sx={{ mt: 2 }}>
-                    Hours
-                  </Typography>
-                  {Object.entries(activity.hours).map(([day, hours]) => (
-                    <Typography key={day} variant="body2">
-                      {day}: {hours}
-                    </Typography>
-                  ))}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Container>
+            ))}
+          </>
+        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+          {activity.address}
+        </Typography>
+      </Box>
+    </Box>
   );
 };
 
