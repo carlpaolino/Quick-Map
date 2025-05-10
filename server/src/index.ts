@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import activityRoutes from './routes/activities';
 import authRoutes from './routes/auth';
+import seatgeekRoutes from './routes/seatgeek';
 
 dotenv.config();
 
@@ -17,6 +18,7 @@ app.use(express.json());
 // Routes
 app.use('/api/activities', activityRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/seatgeek', seatgeekRoutes);
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/quickmap')

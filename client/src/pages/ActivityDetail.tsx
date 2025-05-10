@@ -11,6 +11,12 @@ import {
   Chip,
   Rating,
   Divider,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemAvatar,
+  Avatar,
+  Paper,
 } from '@mui/material';
 import CircularProgress from '@mui/material/CircularProgress';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow } from '@react-google-maps/api';
@@ -37,6 +43,9 @@ const ActivityDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
+  const [related, setRelated] = useState<Activity[]>([]);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
 
   // Moved hooks to top-level to comply with React rules
   const mapContainerStyle = {
@@ -54,6 +63,13 @@ const ActivityDetail: React.FC = () => {
         setLoading(true);
         const response = await axios.get(`http://localhost:5000/api/activities/${id}`);
         setActivity(response.data);
+        // Fetch related activities after main activity loads
+        if (response.data && response.data._id) {
+          const relatedRes = await axios.get(`http://localhost:5000/api/activities/${response.data._id}/related`);
+          setRelated(relatedRes.data);
+        } else {
+          setRelated([]);
+        }
       } catch (error) {
         console.error('Error fetching activity:', error);
       } finally {
@@ -103,7 +119,7 @@ const ActivityDetail: React.FC = () => {
           <Typography variant="h6" gutterBottom>
             Location
           </Typography>
-          <Box sx={{ height: 300, mb: 3 }}>
+          <Box sx={{ height: 300, mb: 3, position: 'relative' }}>
             {!isLoaded ? (
               <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
                 <CircularProgress />
@@ -117,13 +133,49 @@ const ActivityDetail: React.FC = () => {
                 }}
                 zoom={15}
               >
+                {/* Main activity marker */}
                 <Marker
                   position={{
                     lat: activity.location.coordinates[1],
                     lng: activity.location.coordinates[0],
                   }}
                   onClick={() => setInfoOpen(true)}
+                  icon={highlightedId === activity._id ? undefined : undefined}
                 />
+                {/* Related activities markers */}
+                {related.map((rel) => (
+                  <Marker
+                    key={rel._id}
+                    position={{
+                      lat: rel.location.coordinates[1],
+                      lng: rel.location.coordinates[0],
+                    }}
+                    onMouseOver={() => setHighlightedId(rel._id)}
+                    onMouseOut={() => setHighlightedId(null)}
+                    onClick={() => setSelectedMarker(rel._id)}
+                    icon={highlightedId === rel._id || selectedMarker === rel._id ? {
+                      url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                      scaledSize: new window.google.maps.Size(40, 40),
+                    } : undefined}
+                  />
+                ))}
+                {/* InfoWindow for selected related marker */}
+                {selectedMarker && related.find(r => r._id === selectedMarker) && (
+                  <InfoWindow
+                    position={{
+                      lat: related.find(r => r._id === selectedMarker)!.location.coordinates[1],
+                      lng: related.find(r => r._id === selectedMarker)!.location.coordinates[0],
+                    }}
+                    onCloseClick={() => setSelectedMarker(null)}
+                  >
+                    <Box>
+                      <Typography variant="subtitle1" gutterBottom>{related.find(r => r._id === selectedMarker)!.name}</Typography>
+                      <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.address}</Typography>
+                      <Typography variant="body2">{related.find(r => r._id === selectedMarker)!.description}</Typography>
+                    </Box>
+                  </InfoWindow>
+                )}
+                {/* InfoWindow for main activity */}
                 {infoOpen && (
                   <InfoWindow
                     position={{
@@ -147,6 +199,35 @@ const ActivityDetail: React.FC = () => {
           </Typography>
         </Grid>
         <Grid item xs={12} md={4}>
+          <Paper elevation={3} sx={{ mb: 3, p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Related Places & Events
+            </Typography>
+            {related.length === 0 ? (
+              <Typography variant="body2">No related places found.</Typography>
+            ) : (
+              <List dense>
+                {related.map((rel) => (
+                  <ListItem
+                    key={rel._id}
+                    onMouseEnter={() => setHighlightedId(rel._id)}
+                    onMouseLeave={() => setHighlightedId(null)}
+                    onClick={() => setSelectedMarker(rel._id)}
+                    selected={highlightedId === rel._id || selectedMarker === rel._id}
+                    sx={{ cursor: 'pointer', bgcolor: (highlightedId === rel._id || selectedMarker === rel._id) ? 'action.selected' : undefined }}
+                  >
+                    <ListItemAvatar>
+                      <Avatar src={rel.images && rel.images[0]} alt={rel.name} />
+                    </ListItemAvatar>
+                    <ListItemText
+                      primary={rel.name}
+                      secondary={rel.address}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </Paper>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
