@@ -15,6 +15,10 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
+// Use environment variable for API URL if available, otherwise default to localhost
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+console.log('Using API base URL:', API_BASE_URL);
+
 interface Activity {
   _id: string;
   name: string;
@@ -71,7 +75,8 @@ const ActivityList: React.FC = () => {
         params.append('lon', userLocation.lng.toString());
         params.append('range', '100mi');
         // No type filter: get all event types
-        const response = await axios.get(`/api/seatgeek/events?${params}`);
+        const response = await axios.get(`${API_BASE_URL}/api/seatgeek/events?${params}`);
+        console.log("SeatGeek API response from server:", response.data);
         setSeatGeekEvents(response.data);
       } catch (error) {
         setSeatGeekEvents([]);
@@ -107,7 +112,7 @@ const ActivityList: React.FC = () => {
           params.append('lng', userLocation.lng.toString());
         }
 
-        const response = await axios.get(`http://localhost:5000/api/activities?${params}`);
+        const response = await axios.get(`${API_BASE_URL}/api/activities?${params}`);
         setActivities(response.data);
       } catch (error) {
         console.error('Error fetching activities:', error);
