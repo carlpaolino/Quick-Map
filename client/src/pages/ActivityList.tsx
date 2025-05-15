@@ -15,9 +15,9 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
-// Use environment variable for API URL if available, otherwise default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
-console.log('Using API base URL:', API_BASE_URL);
+// Remove hardcoded API URL since we're using the proxy setting in package.json
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+// console.log('Using API base URL:', API_BASE_URL);
 
 interface Activity {
   _id: string;
@@ -75,8 +75,7 @@ const ActivityList: React.FC = () => {
         params.append('lon', userLocation.lng.toString());
         params.append('range', '100mi');
         // No type filter: get all event types
-        const response = await axios.get(`${API_BASE_URL}/api/seatgeek/events?${params}`);
-        console.log("SeatGeek API response from server:", response.data);
+        const response = await axios.get(`/api/seatgeek/events?${params}`);
         setSeatGeekEvents(response.data);
       } catch (error) {
         setSeatGeekEvents([]);
@@ -112,7 +111,7 @@ const ActivityList: React.FC = () => {
           params.append('lng', userLocation.lng.toString());
         }
 
-        const response = await axios.get(`${API_BASE_URL}/api/activities?${params}`);
+        const response = await axios.get(`/api/activities?${params}`);
         setActivities(response.data);
       } catch (error) {
         console.error('Error fetching activities:', error);
@@ -170,47 +169,46 @@ const ActivityList: React.FC = () => {
             'fast food',
             'breakfast',
             'brunch'
-          ],
-          entertainment: [
-            'movie theater',
-            'theater',
-            'concert',
-            'live music',
-            'nightclub',
-            'comedy club',
-            'event venue',
-            'performing arts'
           ]
         };
         if (category === 'entertainment') {
-          // SeatGeek API for entertainment
-          const seatgeekClientId = process.env.REACT_APP_SEATGEEK_CLIENT_ID;
-          const lat = userLocation.lat;
-          const lng = userLocation.lng;
-          const url = `https://api.seatgeek.com/2/events?lat=${lat}&lon=${lng}&range=100mi&client_id=${seatgeekClientId}&per_page=20`;
-          console.log("SeatGeek API URL:", url);
+          // Use the server-side endpoint for SeatGeek events
           try {
-            const response = await axios.get(url);
-            console.log("SeatGeek API response:", response.data);
-            const events = response.data.events.map((event: any) => {
-              const type = event.type || (event.taxonomies && event.taxonomies.length > 0 ? event.taxonomies[0].name : '');
-              const description = event.description || (event.venue ? event.venue.name : '');
-              console.log(`Event: ${event.title}, Type: ${type}`);
-              return {
-                place_id: event.id,
-                name: event.title,
-                vicinity: event.venue ? event.venue.name : '',
-                rating: event.score,
-                url: event.url,
-                date: event.datetime_local,
-                type: type,
-                description: description,
-              };
-            });
-            setGooglePlaces(events);
+            const params = new URLSearchParams();
+            params.append('lat', userLocation.lat.toString());
+            params.append('lon', userLocation.lng.toString());
+            params.append('range', '100mi');
+            
+            const response = await axios.get(`/api/seatgeek/events?${params}`);
+            
+            if (response.data.length === 0) {
+              setGooglePlaces([]);
+              setSeatGeekEvents([]);
+            } else {
+              // Format the events for display
+              const events = response.data.map((event: any) => {
+                const type = event.type || (event.taxonomies && event.taxonomies.length > 0 ? event.taxonomies[0].name : '');
+                return {
+                  place_id: event.id,
+                  name: event.title,
+                  vicinity: event.venue ? event.venue.name : '',
+                  rating: event.score,
+                  url: event.url,
+                  date: event.datetime_local,
+                  type: type,
+                  description: event.description || '',
+                  venue: event.venue, // Include the full venue object for mapping
+                  score: event.score
+                };
+              });
+              
+              setGooglePlaces(events);
+              setSeatGeekEvents(response.data);
+            }
           } catch (e) {
             console.error("SeatGeek API error:", e);
             setGooglePlaces([]);
+            setSeatGeekEvents([]);
           } finally {
             setPlacesLoading(false);
           }
@@ -262,7 +260,7 @@ const ActivityList: React.FC = () => {
 
   const { isLoaded } = useJsApiLoader({
     // process.env is valid in Create React App (CRA) because CRA polyfills it for the browser.
-googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
+    googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
   });
   const [infoOpen, setInfoOpen] = useState(false);
   const [infoActivity, setInfoActivity] = useState<Activity | null>(null);
@@ -323,6 +321,40 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
                     }}
                   />
                 ))}
+                
+                {/* Add markers for SeatGeek events */}
+                {category === 'entertainment' && googlePlaces.map((event: any) => 
+                  event.venue && event.venue.location ? (
+                    <Marker
+                      key={`event-${event.place_id}`}
+                      position={{
+                        lat: event.venue.location.lat,
+                        lng: event.venue.location.lng,
+                      }}
+                      clusterer={clusterer}
+                      icon={{
+                        url: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png',
+                        scaledSize: new window.google.maps.Size(40, 40),
+                      }}
+                      onClick={() => {
+                        // Set up info window data for events
+                        setInfoActivity({
+                          _id: event.place_id,
+                          name: event.name,
+                          description: event.description || '',
+                          category: 'entertainment',
+                          location: {
+                            coordinates: [event.venue.location.lng, event.venue.location.lat],
+                          },
+                          address: event.vicinity || '',
+                          rating: event.rating || 0,
+                        });
+                        setInfoOpen(true);
+                        setSelectedActivity(null);
+                      }}
+                    />
+                  ) : null
+                )}
               </>
             )}
           </MarkerClusterer>
@@ -334,10 +366,53 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
               }}
               onCloseClick={() => setInfoOpen(false)}
             >
-              <Box>
-                <Typography variant="subtitle1" gutterBottom>{infoActivity.name}</Typography>
-                <Typography variant="body2">{infoActivity.address}</Typography>
-                <Typography variant="body2">{infoActivity.description}</Typography>
+              <Box sx={{ maxWidth: 250 }}>
+                <Typography variant="subtitle1" gutterBottom fontWeight="bold">{infoActivity.name}</Typography>
+                {infoActivity.category === 'entertainment' && (
+                  <>
+                    {/* Find matching event details */}
+                    {googlePlaces.find(p => p.place_id === infoActivity._id)?.date && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        {new Date(googlePlaces.find(p => p.place_id === infoActivity._id)?.date || '').toLocaleDateString()}
+                        {' '}
+                        {new Date(googlePlaces.find(p => p.place_id === infoActivity._id)?.date || '').toLocaleTimeString(undefined, { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </Typography>
+                    )}
+                    {googlePlaces.find(p => p.place_id === infoActivity._id)?.vicinity && (
+                      <Typography variant="body2" fontWeight="medium">
+                        {googlePlaces.find(p => p.place_id === infoActivity._id)?.vicinity}
+                      </Typography>
+                    )}
+                  </>
+                )}
+                {infoActivity.address && (
+                  <Typography variant="body2" color="text.secondary">
+                    {infoActivity.address}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ mt: 1 }}>
+                  {infoActivity.description}
+                </Typography>
+                {/* Show ticket link for SeatGeek events */}
+                {infoActivity.category === 'entertainment' && (() => {
+                  const url = googlePlaces.find(p => p.place_id === infoActivity._id)?.url;
+                  return url ? (
+                    <Button 
+                      variant="contained" 
+                      size="small" 
+                      color="primary" 
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{ mt: 2, textTransform: 'none', borderRadius: 1.5, fontSize: '0.75rem' }}
+                    >
+                      Get Tickets
+                    </Button>
+                  ) : null;
+                })()}
               </Box>
             </InfoWindow>
           )}
@@ -360,48 +435,69 @@ googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY || '',
         <Typography variant="h5" gutterBottom>
           {category === 'entertainment' ? 'Events Nearby' : 'Related Places Nearby'}
         </Typography>
+        
         {category === 'entertainment' ? (
-          loading ? (
+          placesLoading ? (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
               <CircularProgress />
             </Box>
-          ) : seatGeekEvents.length > 0 ? (
-            seatGeekEvents.map((event: any) => (
-              <Card key={event.id} sx={{ mb: 2 }}>
-                <CardContent>
-                  <Typography variant="subtitle1" gutterBottom>
-                    {event.title}
-                  </Typography>
-                  {event.datetime_local && (
-                    <Typography variant="body2" color="text.secondary">
-                      Date: {new Date(event.datetime_local).toLocaleString()}
-                    </Typography>
-                  )}
-                  {event.type && (
-                    <Chip label={event.type.charAt(0).toUpperCase() + event.type.slice(1)} size="small" sx={{ mt: 1, mr: 1 }} />
-                  )}
-                  {event.venue && event.venue.name && (
-                    <Typography variant="body2" color="text.secondary">
-                      Venue: {event.venue.name}
-                    </Typography>
-                  )}
-                  {event.description && (
-                    <Typography variant="body2" color="text.secondary">
-                      {event.description}
-                    </Typography>
-                  )}
-                  {event.url && (
-                    <Typography variant="body2">
-                      <a href={event.url} target="_blank" rel="noopener noreferrer">
-                        View Event
-                      </a>
-                    </Typography>
-                  )}
-                </CardContent>
-              </Card>
-            ))
+          ) : googlePlaces && googlePlaces.length > 0 ? (
+            <>
+              <Typography variant="body2" gutterBottom color="text.secondary">
+                Found {googlePlaces.length} events nearby
+              </Typography>
+              
+              {/* Event list rendering */}
+              <Box sx={{ mt: 2 }}>
+                {googlePlaces.slice(0, 30).map((event, index) => (
+                  <Card key={`event-${index}`} sx={{ mb: 2, p: 2, boxShadow: 2, borderRadius: 2 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 'bold' }}>{event.name || 'Unnamed Event'}</Typography>
+                    {event.date && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                        <Box component="span" sx={{ mr: 1 }}>📅</Box>
+                        {new Date(event.date).toLocaleDateString('en-US', { 
+                          month: 'long', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })} • {new Date(event.date).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </Typography>
+                    )}
+                    {event.vicinity && (
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'flex-start' }}>
+                        <Box component="span" sx={{ mr: 1 }}>📍</Box>
+                        <Box>{event.vicinity}</Box>
+                      </Typography>
+                    )}
+                    {event.url && (
+                      <Button 
+                        variant="contained"
+                        size="small"
+                        color="primary"
+                        href={event.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        sx={{ mt: 2, textTransform: 'none', borderRadius: 1.5 }}
+                      >
+                        Get Tickets
+                      </Button>
+                    )}
+                  </Card>
+                ))}
+              </Box>
+            </>
           ) : (
-            <Typography variant="body2">No upcoming events found.</Typography>
+            <Box sx={{ textAlign: 'center', py: 3 }}>
+              <Typography variant="body1" gutterBottom>No upcoming events found.</Typography>
+              <Typography variant="body2" color="text.secondary">
+                Try adjusting your location or check back later for new events.
+              </Typography>
+              <Typography variant="body2" color="primary" sx={{ mt: 2 }}>
+                Debug info: Client using API URL: http://localhost:5002
+              </Typography>
+            </Box>
           )
         ) : (
           placesLoading ? (

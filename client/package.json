@@ -48,5 +48,6 @@
   },
   "devDependencies": {
     "@types/node": "^22.15.17"
-  }
+  },
+  "proxy": "http://localhost:5002"
 }

@@ -39,8 +39,8 @@ interface Activity {
   hours?: Record<string, string>;
 }
 
-// Use environment variable for API URL if available, otherwise default to localhost
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
+// Remove hardcoded API URL since we're using the proxy setting in package.json
+// const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5002';
 
 const ActivityDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -64,11 +64,11 @@ const ActivityDetail: React.FC = () => {
     const fetchActivity = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`${API_BASE_URL}/api/activities/${id}`);
+        const response = await axios.get(`/api/activities/${id}`);
         setActivity(response.data);
         // Fetch related activities after main activity loads
         if (response.data && response.data._id) {
-          const relatedRes = await axios.get(`${API_BASE_URL}/api/activities/${response.data._id}/related`);
+          const relatedRes = await axios.get(`/api/activities/${response.data._id}/related`);
           setRelated(relatedRes.data);
         } else {
           setRelated([]);
