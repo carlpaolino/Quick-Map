@@ -55,14 +55,14 @@ router.get('/events', async (req, res) => {
       ...(lat && lon ? {
         'lat': toStringOrUndefined(lat),
         'lon': toStringOrUndefined(lon),
-        'range': toStringOrUndefined(range) || '100mi'
+        'range': toStringOrUndefined(range) || '25mi'
       } : {}),
       ...(type ? { 'taxonomies.name': toStringOrUndefined(type) } : {}),
       'datetime_utc.gte': new Date().toISOString(),
     };
     
     // Use a larger range to increase chances of finding events
-    if (!params.range || params.range === '100mi') {
+    if (!params.range || params.range === '25mi') {
       params.range = '200mi'; // Increase default range
     }
     

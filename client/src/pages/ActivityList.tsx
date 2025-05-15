@@ -52,6 +52,24 @@ interface GooglePlace {
   url?: string;
   type?: string; // Added type for SeatGeek events
   description?: string; // Added for SeatGeek events
+  venue?: {
+    name?: string;
+    address?: string;
+    city?: string;
+    state?: string;
+    location?: {
+      lat: number;
+      lng: number;
+    }
+  }; // Added venue object for SeatGeek events
+}
+
+// Interface for driving time responses
+interface TravelTimeInfo {
+  eventId: string;
+  drivingTime?: string;
+  loading: boolean;
+  error?: string;
 }
 
 const ActivityList: React.FC = () => {
@@ -64,6 +82,7 @@ const ActivityList: React.FC = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [googlePlaces, setGooglePlaces] = useState<GooglePlace[]>([]);
   const [placesLoading, setPlacesLoading] = useState(false);
+  const [travelTimes, setTravelTimes] = useState<Record<string, TravelTimeInfo>>({});
 
   // Fetch SeatGeek events from backend when userLocation is available
   useEffect(() => {
@@ -73,7 +92,7 @@ const ActivityList: React.FC = () => {
         const params = new URLSearchParams();
         params.append('lat', userLocation.lat.toString());
         params.append('lon', userLocation.lng.toString());
-        params.append('range', '100mi');
+        params.append('range', '25mi');
         // No type filter: get all event types
         const response = await axios.get(`/api/seatgeek/events?${params}`);
         setSeatGeekEvents(response.data);
@@ -290,6 +309,99 @@ const ActivityList: React.FC = () => {
 
   const center = userLocation ? { lat: userLocation.lat, lng: userLocation.lng } : { lat: 34.02, lng: -84.59 };
 
+  // Calculate driving times for events when venues and user location are available
+  useEffect(() => {
+    const calculateDrivingTimes = async () => {
+      if (!userLocation || !googlePlaces || googlePlaces.length === 0 || category !== 'entertainment') {
+        return;
+      }
+
+      // Get venues with location data
+      const venuesWithLocation = googlePlaces.filter((event: GooglePlace) => {
+        const eventWithVenue = event as GooglePlace & { venue?: { location?: { lat: number; lng: number } } };
+        return eventWithVenue.venue && eventWithVenue.venue.location && 
+               eventWithVenue.venue.location.lat && eventWithVenue.venue.location.lng;
+      });
+
+      if (venuesWithLocation.length === 0) return;
+
+      // Prepare for batch processing to reduce API calls
+      const batchSize = 10; // Maximum destinations per Distance Matrix API call
+      for (let i = 0; i < venuesWithLocation.length; i += batchSize) {
+        const batch = venuesWithLocation.slice(i, i + batchSize);
+        
+        // Mark these events as loading
+        const loadingState = batch.reduce((acc: Record<string, TravelTimeInfo>, event: GooglePlace) => {
+          acc[event.place_id] = { eventId: event.place_id, loading: true };
+          return acc;
+        }, {} as Record<string, TravelTimeInfo>);
+        
+        setTravelTimes(prev => ({ ...prev, ...loadingState }));
+        
+        const origins = [{ lat: userLocation.lat, lng: userLocation.lng }];
+        const destinations = batch.map((event: GooglePlace) => {
+          const eventWithVenue = event as GooglePlace & { venue: { location: { lat: number; lng: number } } };
+          return { 
+            lat: eventWithVenue.venue.location.lat, 
+            lng: eventWithVenue.venue.location.lng 
+          };
+        });
+        
+        try {
+          // Try to use the Distance Matrix API directly (if user has proper API key)
+          // This will be protected by API key restrictions so it's safe to call client-side
+          const service = new google.maps.DistanceMatrixService();
+          const response = await service.getDistanceMatrix({
+            origins,
+            destinations,
+            travelMode: google.maps.TravelMode.DRIVING,
+            unitSystem: google.maps.UnitSystem.IMPERIAL
+          });
+          
+          // Process results
+          const newTravelTimes: Record<string, TravelTimeInfo> = {};
+          
+          if (response.rows[0] && response.rows[0].elements) {
+            batch.forEach((event: GooglePlace, index: number) => {
+              const element = response.rows[0].elements[index];
+              if (element.status === 'OK') {
+                newTravelTimes[event.place_id] = {
+                  eventId: event.place_id,
+                  drivingTime: element.duration.text,
+                  loading: false
+                };
+              } else {
+                newTravelTimes[event.place_id] = {
+                  eventId: event.place_id,
+                  loading: false,
+                  error: 'Unable to calculate driving time'
+                };
+              }
+            });
+          }
+          
+          setTravelTimes(prev => ({ ...prev, ...newTravelTimes }));
+        } catch (error) {
+          // If direct API call fails, mark all as error
+          const errorState = batch.reduce((acc: Record<string, TravelTimeInfo>, event: GooglePlace) => {
+            acc[event.place_id] = { 
+              eventId: event.place_id, 
+              loading: false, 
+              error: 'Could not calculate driving time' 
+            };
+            return acc;
+          }, {} as Record<string, TravelTimeInfo>);
+          
+          setTravelTimes(prev => ({ ...prev, ...errorState }));
+        }
+      }
+    };
+
+    if (isLoaded) {
+      calculateDrivingTimes();
+    }
+  }, [userLocation, googlePlaces, category, isLoaded]);
+
   return (
     <Box sx={{ width: '100vw', height: '100vh', position: 'relative' }}>
       {/* Fullscreen Google Map */}
@@ -386,6 +498,13 @@ const ActivityList: React.FC = () => {
                         {googlePlaces.find(p => p.place_id === infoActivity._id)?.vicinity}
                       </Typography>
                     )}
+                    {/* Show driving time in info window */}
+                    {travelTimes[infoActivity._id]?.drivingTime && (
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <Box component="span" sx={{ mr: 1 }}>🚗</Box>
+                        <Box>{travelTimes[infoActivity._id].drivingTime} drive</Box>
+                      </Typography>
+                    )}
                   </>
                 )}
                 {infoActivity.address && (
@@ -471,6 +590,18 @@ const ActivityList: React.FC = () => {
                         <Box>{event.vicinity}</Box>
                       </Typography>
                     )}
+                    {/* Driving time */}
+                    {travelTimes[event.place_id]?.loading ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <Box component="span" sx={{ mr: 1 }}>🚗</Box>
+                        <Box>Calculating travel time...</Box>
+                      </Typography>
+                    ) : travelTimes[event.place_id]?.drivingTime ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', mt: 1 }}>
+                        <Box component="span" sx={{ mr: 1 }}>🚗</Box>
+                        <Box>{travelTimes[event.place_id].drivingTime} drive</Box>
+                      </Typography>
+                    ) : null}
                     {event.url && (
                       <Button 
                         variant="contained"
