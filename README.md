@@ -34,12 +34,26 @@ A modern web application that helps couples, families, and friends discover and 
    ```bash
    npm install
    ```
-3. Create a `.env` file in the root directory with the following variables:
+3. Set up environment variables:
+   
+   **For the server:**
+   ```bash
+   cp server/.env.example server/.env
    ```
-   MONGODB_URI=your_mongodb_uri
-   GOOGLE_MAPS_API_KEY=your_google_maps_api_key
-   JWT_SECRET=your_jwt_secret
+   Then edit `server/.env` with your actual values.
+   
+   **For the client:**
+   ```bash
+   cp client/.env.example client/.env
    ```
+   Then edit `client/.env` with your actual values.
+   
+   **Required environment variables:**
+   - `MONGODB_URI`: Your MongoDB connection string
+   - `GOOGLE_MAPS_API_KEY`: Your Google Maps API key
+   - `JWT_SECRET`: A secure random string for JWT signing
+   - `REACT_APP_GOOGLE_MAPS_API_KEY`: Same as above, for client-side usage
+   
 4. Start the development server:
    ```bash
    npm run dev
