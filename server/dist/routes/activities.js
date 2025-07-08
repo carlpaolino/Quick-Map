@@ -41,10 +41,44 @@ router.get('/:id', async (req, res) => {
         if (!activity) {
             return res.status(404).json({ message: 'Activity not found' });
         }
+        if (!activity.location || !activity.location.coordinates) {
+            return res.status(400).json({ message: 'Activity location is missing or invalid' });
+        }
         res.json(activity);
     }
     catch (error) {
         res.status(500).json({ message: 'Error fetching activity', error });
+    }
+});
+// Get related activities by category and proximity (excluding itself)
+router.get('/:id/related', async (req, res) => {
+    try {
+        const { radius = 5000, limit = 8 } = req.query;
+        const activity = await Activity_1.default.findById(req.params.id);
+        if (!activity) {
+            return res.status(404).json({ message: 'Activity not found' });
+        }
+        if (!activity.location || !activity.location.coordinates) {
+            return res.status(400).json({ message: 'Activity location is missing or invalid' });
+        }
+        const related = await Activity_1.default.find({
+            _id: { $ne: activity._id },
+            category: activity.category,
+            location: {
+                $near: {
+                    $geometry: {
+                        type: 'Point',
+                        coordinates: activity.location.coordinates,
+                    },
+                    $maxDistance: parseInt(radius),
+                },
+            },
+        })
+            .limit(parseInt(limit));
+        res.json(related);
+    }
+    catch (error) {
+        res.status(500).json({ message: 'Error fetching related activities', error });
     }
 });
 // Create new activity
